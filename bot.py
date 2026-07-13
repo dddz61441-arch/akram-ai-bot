@@ -1,7 +1,10 @@
-from flask import Flask, request, render_template_string, jsonify
+from flask import Flask, request, render_template_string, jsonify, session
+import os
 from g4f.client import Client
 
 app = Flask(__name__)
+# مفتاح سري لتشفير الجلسات (مهم جداً لعمل session)
+app.secret_key = os.urandom(24)
 client = Client()
 
 HTML_TEMPLATE = """
@@ -44,7 +47,7 @@ HTML_TEMPLATE = """
             }).then(r => r.json()).then(d => {
                 c.innerHTML += '<div class="msg bot">البوت: '+d.reply+'</div>';
                 c.scrollTop = c.scrollHeight;
-            }).catch(() => { c.innerHTML += '<div class="msg bot">خطأ في الاتصال، حاول مجدداً</div>'; });
+            });
         }
     </script>
 </body>
@@ -52,20 +55,23 @@ HTML_TEMPLATE = """
 """
 
 @app.route('/')
-def home(): return render_template_string(HTML_TEMPLATE)
+def home():
+    # إعادة تهيئة المحادثة لكل مستخدم عند دخول الرابط
+    session['history'] = []
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message')
+    # الاعتماد على محادثة قصيرة جداً لتقليل الضغط
     try:
-        # استخدام موديل GPT-3.5-Turbo كخيار افتراضي ثابت ومستقر
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": user_msg}]
         )
         return jsonify({"reply": response.choices[0].message.content})
-    except Exception as e:
-        return jsonify({"reply": "البوت مشغول حالياً، يرجى المحاولة بعد لحظات."})
+    except:
+        return jsonify({"reply": "عذراً، يرجى تحديث الصفحة والمحاولة مرة أخرى."})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
